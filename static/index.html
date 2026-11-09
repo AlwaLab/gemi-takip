@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gemi Takip</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 19 21 12 17 5 21Z' fill='%232f7df6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="panel">
+      <header class="panel-head">
+        <div class="brand">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2 19 21 12 17 5 21Z" fill="currentColor"/></svg>
+          <h1>Gemi Takip</h1>
+        </div>
+        <button class="icon-btn" id="settingsBtn" title="Ayarlar" aria-label="Ayarlar">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+        </button>
+      </header>
+
+      <div class="status" id="status">
+        <span class="dot"></span><span id="statusText">Bağlanıyor…</span>
+      </div>
+      <div class="demo-banner" id="demoBanner" hidden>
+        <strong>Demo modu:</strong> gösterilen gemiler simülasyondur.
+        Gerçek veri için <button class="link" id="demoSetup">API anahtarı ekleyin</button>.
+      </div>
+
+      <form class="add-form" id="addForm" autocomplete="off">
+        <label class="field">
+          <span>MMSI</span>
+          <input id="mmsiInput" inputmode="numeric" pattern="\d{9}" maxlength="9" placeholder="ör. 271000835" required>
+        </label>
+        <label class="field">
+          <span>Etiket <em>(isteğe bağlı)</em></span>
+          <input id="labelInput" maxlength="60" placeholder="ör. Bizim tanker">
+        </label>
+        <button class="btn primary" type="submit">Takibe al</button>
+        <p class="form-msg" id="formMsg" role="alert"></p>
+      </form>
+
+      <div class="list-head">
+        <h2>Takip listesi <span class="count" id="count">0</span></h2>
+      </div>
+      <ul class="watchlist" id="watchlist"></ul>
+      <p class="empty" id="emptyMsg">
+        Henüz gemi yok. MMSI numarasını yukarıya girin ya da haritada
+        <strong>Keşfet</strong>'i açıp bir gemiye tıklayın.
+      </p>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map"></div>
+      <div class="map-tools">
+        <button class="btn tool" id="exploreBtn" aria-pressed="false" title="Haritadaki görünür alandaki tüm gemileri göster">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>
+          <span>Keşfet</span>
+        </button>
+        <button class="btn tool" id="fitBtn" title="Tüm takip edilen gemileri göster">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4Z"/></svg>
+          <span>Tümü</span>
+        </button>
+      </div>
+      <div class="explore-hint" id="exploreHint" hidden></div>
+
+      <section class="detail" id="detail" hidden aria-live="polite">
+        <button class="icon-btn close" id="detailClose" aria-label="Kapat">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6 10.6 12 5 6.4Z"/></svg>
+        </button>
+        <div id="detailBody"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="settings">
+    <form method="dialog" id="settingsForm">
+      <h2>Veri kaynağı</h2>
+      <p>
+        Canlı AIS verisi <strong>aisstream.io</strong> üzerinden gelir. Ücretsiz hesap açıp
+        API anahtarı alın: <a href="https://aisstream.io/authenticate" target="_blank" rel="noopener">aisstream.io</a>
+        → giriş yapın → <em>API Keys</em> → yeni anahtar.
+      </p>
+      <p class="note">
+        Not: Bu kaynak çoğunlukla kıyı alıcılarından beslenir. Açık denizdeki gemiler
+        kıyıya yaklaşana kadar sessiz kalabilir. Küresel uydu kapsamı için ileride ücretli bir
+        sağlayıcı (Spire, Datalastic vb.) eklenebilir.
+      </p>
+      <label class="field">
+        <span>aisstream.io API anahtarı</span>
+        <input id="keyInput" type="password" placeholder="Anahtarı yapıştırın" autocomplete="off">
+      </label>
+      <p class="key-state" id="keyState"></p>
+      <div class="dialog-actions">
+        <button class="btn" value="cancel" formnovalidate>Vazgeç</button>
+        <button class="btn primary" id="saveKey" value="save">Kaydet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

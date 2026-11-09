@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gemi Takip</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 19 21 12 17 5 21Z' fill='%232f7df6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="panel">
+      <header class="panel-head">
+        <div class="brand">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2 19 21 12 17 5 21Z" fill="currentColor"/></svg>
+          <h1>Gemi Takip</h1>
+        </div>
+      </header>
+
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">Yükleniyor…</span></div>
+
+      <div class="panel-actions">
+        <a class="btn primary" id="downloadAll" href="data/positions.csv" download="gemi-konumlari.csv">Tüm konumları indir (CSV)</a>
+        <label class="field">
+          <span>Haritada gösterilen rota</span>
+          <select id="range">
+            <option value="1">Son 24 saat</option>
+            <option value="7" selected>Son 7 gün</option>
+            <option value="30">Son 30 gün</option>
+            <option value="0">Tümü</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="list-head"><h2>Takip listesi <span class="count" id="count">0</span></h2></div>
+      <ul class="watchlist" id="watchlist"></ul>
+      <p class="empty" id="emptyMsg" hidden>Takip listesi boş. Aşağıdaki adımlarla gemi ekleyin.</p>
+
+      <details class="help" id="help">
+        <summary>Gemi ekle / çıkar</summary>
+        <p>Gemi listesi GitHub'daki <code>ships.json</code> dosyasında durur.</p>
+        <ol>
+          <li><a id="editLink" href="#" target="_blank" rel="noopener">ships.json dosyasını düzenle</a> (GitHub'a giriş yapmış olmalısınız).</li>
+          <li>Her gemi için bir satır ekleyin; satırlar arasında virgül olmalı:</li>
+        </ol>
+        <pre>{
+  "ships": [
+    {"mmsi": "271000835", "label": "Bizim tanker"},
+    {"mmsi": "240894000", "label": ""}
+  ]
+}</pre>
+        <p>Sağ üstte <strong>Commit changes</strong> deyin. Birkaç dakika içinde ilk konum toplanır.
+          MMSI numarasını bilmiyorsanız MarineTraffic veya VesselFinder'da gemi adını aratın.</p>
+      </details>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map"></div>
+      <div class="map-tools">
+        <button class="btn tool" id="fitBtn" title="Tüm gemileri göster">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4Z"/></svg>
+          <span>Tümü</span>
+        </button>
+      </div>
+      <section class="detail" id="detail" hidden aria-live="polite">
+        <button class="icon-btn close" id="detailClose" aria-label="Kapat">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6 10.6 12 5 6.4Z"/></svg>
+        </button>
+        <div id="detailBody"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="viewer.js"></script>
+</body>
+</html>
