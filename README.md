@@ -1,5 +1,7 @@
 # Gemi Takip
 
+## 👉 [Haritayı aç: alwalab.github.io/gemi-takip](https://alwalab.github.io/gemi-takip/)
+
 Seçtiğiniz gemilerin konumunu her 30 dakikada bir toplayan ve herhangi bir bilgisayardan
 açılabilen bir harita sayfası. Her şey ücretsiz GitHub üzerinde çalışır; bilgisayarınızın açık
 olması gerekmez.
