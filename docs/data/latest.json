@@ -1,5 +1,20 @@
 {
- "ships": {},
- "order": [],
- "updated": "2026-11-09T17:14:00Z"
+ "ships": {
+  "368139310": {
+   "mmsi": "368139310",
+   "name": "M/V BELLA VITA",
+   "lat": 32.750838333333334,
+   "lon": -80.01054166666667,
+   "sog": 0,
+   "cog": 206.3,
+   "msg_class": "A",
+   "nav_status": 0,
+   "label": "M/V BELLA VITA",
+   "last_seen": "2026-11-09T17:24:12Z"
+  }
+ },
+ "order": [
+  "368139310"
+ ],
+ "updated": "2026-11-09T17:24:12Z"
 }
