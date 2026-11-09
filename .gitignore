@@ -1,6 +1,6 @@
 # local only - never commit
 .venv/
-data/
+/data/
 __pycache__/
 *.pyc
 .claude/
