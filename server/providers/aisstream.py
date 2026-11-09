@@ -34,7 +34,7 @@ class AisStreamProvider:
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    async def stream(self, mmsis: list[str] | None = None, bbox=None):
+    async def stream(self, mmsis: list[str] | None = None, bbox=None, message_types=None):
         """Yield normalized updates forever, reconnecting on network errors.
 
         mmsis: only these vessels (max 50).  bbox: [[lat1, lon1], [lat2, lon2]].
@@ -42,7 +42,7 @@ class AisStreamProvider:
         sub = {
             "APIKey": self.api_key,
             "BoundingBoxes": [bbox] if bbox else WORLD,
-            "FilterMessageTypes": MESSAGE_TYPES,
+            "FilterMessageTypes": message_types or MESSAGE_TYPES,
         }
         if mmsis:
             sub["FiltersShipMMSI"] = [str(m) for m in mmsis[:MAX_MMSI_FILTER]]

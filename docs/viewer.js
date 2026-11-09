@@ -24,6 +24,16 @@
   const shipType = (t) => (SHIP_TYPES.find(([a, b]) => t >= a && t <= b) || [])[2] || null;
 
   const $ = (id) => document.getElementById(id);
+
+  // Repo holding ships/: owner.github.io/repo/ -> github.com/owner/repo
+  const REPO = location.hostname.endsWith(".github.io")
+    ? `${location.hostname.split(".")[0]}/${location.pathname.split("/").filter(Boolean)[0]}`
+    : "AlwaLab/gemi-takip";
+  const GH = `https://github.com/${REPO}`;
+  const addUrl = (mmsi, label) =>
+    `${GH}/new/main/ships?filename=${mmsi}.txt&value=${encodeURIComponent(label && !/^MMSI /.test(label) ? label : "")}`;
+  const editUrl = (mmsi) => `${GH}/edit/main/ships/${mmsi}.txt`;
+  const deleteUrl = (mmsi) => `${GH}/delete/main/ships/${mmsi}.txt`;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   let ships = [];          // [{mmsi, color, state}]
@@ -178,7 +188,11 @@
       <div class="type">${esc(shipType(s.ship_type) || "Tip bilgisi bekleniyor")}</div>
       <dl class="kv">${kv.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
       ${ts && Date.now() / 1000 - ts > STALE_H * 3600 ? `<p class="ext">Son konum ${STALE_H} saatten eski: gemi kıyı alıcılarının menzili dışında olabilir.</p>` : ""}
-      <div class="actions"><button class="btn" id="dlShip" ${n ? "" : "disabled"}>Bu geminin konumlarını indir</button></div>
+      <div class="actions">
+        <button class="btn" id="dlShip" ${n ? "" : "disabled"}>Konumlarını indir</button>
+        <a class="btn" href="${editUrl(s.mmsi)}" target="_blank" rel="noopener">Etiketi değiştir</a>
+        <a class="btn danger" href="${deleteUrl(s.mmsi)}" target="_blank" rel="noopener" title="GitHub'da dosyayı silip Commit changes deyin">Takipten çıkar</a>
+      </div>
       <p class="ext">Karşılaştır:
         <a href="https://www.marinetraffic.com/en/ais/details/ships/mmsi:${esc(s.mmsi)}" target="_blank" rel="noopener">MarineTraffic</a> ·
         <a href="https://www.vesselfinder.com/vessels/details/${esc(s.mmsi)}" target="_blank" rel="noopener">VesselFinder</a></p>`;
@@ -232,14 +246,83 @@
     }
   }
 
-  // "Edit ships.json" link: owner.github.io/repo/ -> github.com/owner/repo
-  (() => {
-    const owner = location.hostname.endsWith(".github.io") ? location.hostname.split(".")[0] : null;
-    const repo = location.pathname.split("/").filter(Boolean)[0];
-    const link = $("editLink");
-    if (owner && repo) link.href = `https://github.com/${owner}/${repo}/edit/main/ships.json`;
-    else link.removeAttribute("href");
-  })();
+  // ---------------------------------------------------------------- search
+  const TR = { "İ": "I", "I": "I", "ı": "I", "Ş": "S", "ş": "S", "Ğ": "G", "ğ": "G", "Ü": "U", "ü": "U", "Ö": "O", "ö": "O", "Ç": "C", "ç": "C" };
+  const norm = (s) => String(s || "").replace(/[İIıŞşĞğÜüÖöÇç]/g, (c) => TR[c]).toUpperCase().replace(/[^A-Z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  let directory = null;      // [[mmsi, name, type, imo, callsign], ...]
+  let dirLoading = null;
+
+  function loadDirectory() {
+    if (!dirLoading) {
+      dirLoading = fetch(`data/directory.json?t=${Math.floor(Date.now() / 1800000)}`)
+        .then((r) => (r.ok ? r.json() : []))
+        .catch(() => [])
+        .then((rows) => { directory = rows.map((r) => ({ r, key: norm(r[1]) })); return directory; });
+    }
+    return dirLoading;
+  }
+
+  function search(q) {
+    const nq = norm(q);
+    if (!nq) return [];
+    const digits = /^\d+$/.test(nq);
+    const tracked = new Set(ships.map((s) => s.mmsi));
+    const hits = [];
+    for (const { r, key } of directory) {
+      let score = -1;
+      if (digits) {
+        if (r[0].startsWith(nq)) score = r[0] === nq ? 0 : 2;
+        else if (r[3] && String(r[3]) === nq) score = 0;
+      } else if (key === nq) score = 0;
+      else if (key.startsWith(nq)) score = 1;
+      else if (key.includes(nq)) score = 2;
+      if (score >= 0) hits.push({ r, score: score - (tracked.has(r[0]) ? 0.5 : 0) });
+    }
+    hits.sort((a, b) => a.score - b.score || a.r[1].localeCompare(b.r[1]));
+    return hits.slice(0, 30).map((h) => h.r);
+  }
+
+  function resultItem(mmsi, name, sub) {
+    const tracked = ships.some((s) => s.mmsi === mmsi);
+    const action = tracked
+      ? `<span class="badge" data-show="${mmsi}">Takipte</span>`
+      : `<a class="btn primary" href="${addUrl(mmsi, name)}" target="_blank" rel="noopener" data-add="${mmsi}">Takibe al</a>`;
+    return `<li class="result"><div class="r-info"><div class="r-name">${esc(name)}</div><div class="r-sub">${esc(sub)}</div></div>${action}</li>`;
+  }
+
+  let searchTimer;
+  async function runSearch() {
+    const q = $("searchInput").value;
+    const msg = $("searchMsg");
+    const list = $("results");
+    if (!norm(q)) { list.innerHTML = ""; msg.textContent = ""; return; }
+    if (!directory) { msg.textContent = "Gemi rehberi yükleniyor…"; await loadDirectory(); }
+    if (q !== $("searchInput").value) return; // user kept typing
+    const hits = search(q);
+    const nq = norm(q);
+    let html = hits.map((r) => resultItem(r[0], r[1],
+      [shipType(r[2]), `MMSI ${r[0]}`, r[3] ? `IMO ${r[3]}` : null, r[4]].filter(Boolean).join(" · "))).join("");
+    if (/^\d{9}$/.test(nq) && !hits.some((r) => r[0] === nq)) {
+      html = resultItem(nq, `MMSI ${nq}`, "Rehberde yok, MMSI ile ekle") + html;
+    }
+    list.innerHTML = html;
+    if (hits.length) {
+      msg.textContent = hits.length === 30 ? "İlk 30 sonuç gösteriliyor; aramayı daraltın." : "";
+    } else if (!/^\d{9}$/.test(nq)) {
+      msg.innerHTML = `Rehberde bulunamadı (${directory.length.toLocaleString("tr-TR")} gemi içinde). ` +
+        `Rehber her 30 dakikada büyür. MMSI'yi <a href="https://www.vesselfinder.com/vessels?name=${encodeURIComponent(q.trim())}" target="_blank" rel="noopener">VesselFinder</a>'da bulup buraya yazabilirsiniz.`;
+    } else msg.textContent = "";
+  }
+
+  $("searchInput").addEventListener("focus", loadDirectory, { once: true });
+  $("searchInput").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 200); });
+  $("results").addEventListener("click", (ev) => {
+    const show = ev.target.closest("[data-show]");
+    if (show) select(show.dataset.show, true);
+    if (ev.target.closest("[data-add]")) {
+      $("searchMsg").innerHTML = "GitHub'da açılan sayfada <strong>Commit changes</strong>'e basın. Gemi birkaç dakika içinde listeye gelir (sayfayı yenileyin).";
+    }
+  });
 
   $("range").addEventListener("change", renderMap);
   $("fitBtn").addEventListener("click", fitAll);

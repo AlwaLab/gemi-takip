@@ -20,6 +20,15 @@
 
       <div class="status" id="status"><span class="dot"></span><span id="statusText">Yükleniyor…</span></div>
 
+      <div class="search">
+        <label class="field">
+          <span>Gemi ara</span>
+          <input id="searchInput" type="search" placeholder="Gemi adı, MMSI veya IMO" autocomplete="off" spellcheck="false">
+        </label>
+        <p class="search-msg" id="searchMsg"></p>
+        <ul class="results" id="results"></ul>
+      </div>
+
       <div class="panel-actions">
         <a class="btn primary" id="downloadAll" href="data/positions.csv" download="gemi-konumlari.csv">Tüm konumları indir (CSV)</a>
         <label class="field">
@@ -35,23 +44,18 @@
 
       <div class="list-head"><h2>Takip listesi <span class="count" id="count">0</span></h2></div>
       <ul class="watchlist" id="watchlist"></ul>
-      <p class="empty" id="emptyMsg" hidden>Takip listesi boş. Aşağıdaki adımlarla gemi ekleyin.</p>
+      <p class="empty" id="emptyMsg" hidden>Takip listesi boş. Yukarıdaki kutuda gemi adını arayıp <strong>Takibe al</strong>'a basın.</p>
 
       <details class="help" id="help">
-        <summary>Gemi ekle / çıkar</summary>
-        <p>Gemi listesi GitHub'daki <code>ships.json</code> dosyasında durur.</p>
+        <summary>Takibe alma nasıl çalışır?</summary>
         <ol>
-          <li><a id="editLink" href="#" target="_blank" rel="noopener">ships.json dosyasını düzenle</a> (GitHub'a giriş yapmış olmalısınız).</li>
-          <li>Her gemi için bir satır ekleyin; satırlar arasında virgül olmalı:</li>
+          <li>Aramada gemiyi bulup <strong>Takibe al</strong>'a basın.</li>
+          <li>GitHub hazır doldurulmuş bir sayfa açar (AlwaLab hesabıyla giriş yapmış olmalısınız).
+            İsterseniz kutudaki etiketi değiştirin, sonra <strong>Commit changes</strong> deyin.</li>
+          <li>Gemi birkaç dakika içinde bu listeye gelir; konumu 30 dakikada bir güncellenir.</li>
         </ol>
-        <pre>{
-  "ships": [
-    {"mmsi": "271000835", "label": "Bizim tanker"},
-    {"mmsi": "240894000", "label": ""}
-  ]
-}</pre>
-        <p>Sağ üstte <strong>Commit changes</strong> deyin. Birkaç dakika içinde ilk konum toplanır.
-          MMSI numarasını bilmiyorsanız MarineTraffic veya VesselFinder'da gemi adını aratın.</p>
+        <p>Arama rehberi, kıyı alıcılarının duyduğu gemilerden her 30 dakikada bir büyür.
+          Aradığınız gemi yoksa MMSI numarasını yazarak da ekleyebilirsiniz.</p>
       </details>
     </aside>
 

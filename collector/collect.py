@@ -1,5 +1,10 @@
-"""One collection round: listen to aisstream.io for the ships in ships.json,
-then append their latest positions to docs/data/.
+"""One collection round: listen to aisstream.io for the ships in ships/,
+append their latest positions to docs/data/, then grow the ship-name
+directory used by the search box.
+
+Tracked ships are files in ships/: `ships/<MMSI>.txt`, the first line is an
+optional label. One file per ship lets the web page add a ship with a single
+pre-filled GitHub "new file" link.
 
 Run from the repo root:
     python -m collector.collect            # uses AISSTREAM_API_KEY or data/config.json
@@ -21,11 +26,15 @@ from server.providers.aisstream import AisStreamProvider
 from server.providers.base import ProviderError
 from server.providers.demo import DemoProvider
 
+from . import directory
+
 ROOT = Path(__file__).resolve().parent.parent
-SHIPS_FILE = ROOT / "ships.json"
+SHIPS_DIR = ROOT / "ships"
 OUT = ROOT / "docs" / "data"
 LATEST = OUT / "latest.json"
 CSV_FILE = OUT / "positions.csv"
+DIRECTORY_FILE = OUT / "directory.json"
+DIRECTORY_SCAN_S = 90
 CSV_COLUMNS = ["time_utc", "mmsi", "name", "label", "lat", "lon", "speed_kn",
                "course", "heading", "nav_status", "destination"]
 
@@ -38,14 +47,24 @@ def iso(ts: float) -> str:
 
 
 def load_ships() -> dict[str, str]:
-    data = json.loads(SHIPS_FILE.read_text(encoding="utf-8"))
-    ships = {}
-    for item in data.get("ships", []):
-        mmsi = str(item.get("mmsi", "")).strip()
+    """{mmsi: label} from ships/<MMSI>.txt, in the order the files were added."""
+    files = []
+    for path in SHIPS_DIR.glob("*.txt"):
+        mmsi = path.stem.strip()
         if len(mmsi) == 9 and mmsi.isdigit():
-            ships[mmsi] = (item.get("label") or "").strip()
+            files.append(path)
         else:
-            print(f"! ships.json: geçersiz MMSI atlandı: {item!r}")
+            print(f"! ships/{path.name}: dosya adı 9 haneli MMSI olmalı, atlandı")
+    try:
+        latest_order = json.loads(LATEST.read_text(encoding="utf-8")).get("order", [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        latest_order = []
+    rank = {m: i for i, m in enumerate(latest_order)}  # keep existing ships first, new ones after
+    files.sort(key=lambda p: (rank.get(p.stem, len(rank)), p.stem))
+    ships = {}
+    for path in files:
+        text = path.read_text(encoding="utf-8-sig").strip()
+        ships[path.stem] = text.splitlines()[0].strip()[:60] if text else ""
     return ships
 
 
@@ -125,12 +144,7 @@ def main() -> int:
     parser.add_argument("--demo", action="store_true", help="simulated ships, no API key needed")
     args = parser.parse_args()
 
-    ships = load_ships()
-    if not ships:
-        print("ships.json boş; takip edilecek gemi yok.")
-        save({}, {}, time.time())
-        return 0
-
+    key = None
     if args.demo:
         provider = DemoProvider()
     else:
@@ -140,18 +154,36 @@ def main() -> int:
             return 1
         provider = AisStreamProvider(key)
 
-    print(f"{len(ships)} gemi dinleniyor (en fazla {LISTEN_MAX_S} sn)…")
-    try:
-        seen = asyncio.run(listen(provider, ships))
-    except ProviderError as exc:
-        print(f"HATA: {exc}", file=sys.stderr)
-        return 1
+    ships = load_ships()
+    seen: dict[str, dict] = {}
+    if ships:
+        print(f"{len(ships)} gemi dinleniyor (en fazla {LISTEN_MAX_S} sn)…")
+        try:
+            seen = asyncio.run(listen(provider, ships))
+        except ProviderError as exc:
+            print(f"HATA: {exc}", file=sys.stderr)
+            return 1
+    else:
+        print("ships/ klasöründe gemi yok; takip edilecek gemi yok.")
 
     reported = save(ships, seen, time.time())
     for mmsi, label in ships.items():
         mark = "✓ konum" if mmsi in reported else "– sinyal yok"
         name = seen.get(mmsi, {}).get("name") or label
         print(f"  {mmsi} {name or ''}: {mark}")
+
+    if key:  # grow the search directory (skipped in demo mode)
+        entries = directory.load(DIRECTORY_FILE)
+        before = len(entries)
+        for upd in seen.values():
+            directory.merge(entries, upd)
+        try:
+            msgs, changed = asyncio.run(directory.scan(key, DIRECTORY_SCAN_S, entries))
+        except ProviderError as exc:
+            print(f"! Rehber taraması atlandı: {exc}")
+            msgs, changed = 0, 0
+        directory.save(DIRECTORY_FILE, entries)
+        print(f"Rehber: {msgs} mesaj, {changed} değişiklik, {len(entries) - before} yeni gemi, toplam {len(entries)}")
     return 0
 
 

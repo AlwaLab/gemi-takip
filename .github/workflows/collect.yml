@@ -5,7 +5,7 @@ on:
     - cron: "*/30 * * * *"   # every 30 minutes (GitHub may delay a few minutes)
   workflow_dispatch:          # "Run workflow" button for a manual run
   push:
-    paths: ["ships.json"]     # collect right after the ship list changes
+    paths: ["ships/**"]       # collect right after a ship is added or removed
 
 permissions:
   contents: write

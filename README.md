@@ -9,29 +9,24 @@ olması gerekmez.
 ## Nasıl çalışır
 
 1. GitHub Actions her 30 dakikada bir `collector/collect.py` betiğini çalıştırır.
-2. Betik birkaç dakika boyunca aisstream.io'yu dinler ve `ships.json` içindeki gemilerin
+2. Betik birkaç dakika boyunca aisstream.io'yu dinler ve `ships/` klasöründeki gemilerin
    konumunu alır.
 3. Konumlar `docs/data/positions.csv` (tüm geçmiş) ve `docs/data/latest.json` (son durum)
    dosyalarına yazılıp depoya kaydedilir.
-4. GitHub Pages, `docs/` klasörünü `https://KULLANICI.github.io/DEPO/` adresinde yayınlar.
-   Sayfa haritayı, rotaları ve "Tüm konumları indir (CSV)" düğmesini gösterir.
+4. Ardından 90 saniye boyunca dünya genelindeki gemi isimlerini dinleyip arama rehberini
+   (`docs/data/directory.json`) büyütür.
+5. GitHub Pages, `docs/` klasörünü `https://KULLANICI.github.io/DEPO/` adresinde yayınlar.
 
-## Gemi ekleme / çıkarma
+## Gemi arama ve ekleme
 
-GitHub'da `ships.json` dosyasını düzenleyin (sayfadaki *Gemi ekle / çıkar* bağlantısı doğrudan
-oraya götürür):
+Sayfadaki **Gemi ara** kutusuna gemi adı, MMSI veya IMO yazın ve **Takibe al**'a basın.
+GitHub, `ships/<MMSI>.txt` dosyasını hazır doldurulmuş olarak açar; **Commit changes** demeniz
+yeterli. Toplama hemen bir kez çalışır, sonra her 30 dakikada bir devam eder.
 
-```json
-{
-  "ships": [
-    {"mmsi": "271000835", "label": "Bizim tanker"},
-    {"mmsi": "240894000", "label": ""}
-  ]
-}
-```
+Takipten çıkarmak için gemiye tıklayıp **Takipten çıkar** deyin (dosya silinir).
 
-Kaydettiğinizde toplama hemen bir kez çalışır, sonra her 30 dakikada bir devam eder.
-MMSI numarasını bilmiyorsanız MarineTraffic veya VesselFinder'da gemi adını aratın.
+Arama rehberi yalnızca kıyı alıcılarının duyduğu gemileri içerir ve zamanla büyür. Gemi
+rehberde yoksa 9 haneli MMSI numarasını arama kutusuna yazarak da ekleyebilirsiniz.
 
 ## Kurulum (bir kerelik)
 
@@ -59,8 +54,9 @@ Bu bilgisayarda canlı (saniyelik) takip için eski uygulama da duruyor: `start.
 ## Dosyalar
 
 ```
-ships.json                    takip edilen gemiler
+ships/<MMSI>.txt              takip edilen gemiler (içerik: etiket)
 collector/collect.py          30 dakikalık toplama turu
+collector/directory.py        arama rehberi
 .github/workflows/collect.yml GitHub zamanlayıcısı
 docs/                         yayınlanan harita sayfası ve veriler
 server/, static/, start.bat   yerel canlı uygulama
