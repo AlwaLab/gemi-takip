@@ -30,8 +30,10 @@
     ? `${location.hostname.split(".")[0]}/${location.pathname.split("/").filter(Boolean)[0]}`
     : "AlwaLab/gemi-takip";
   const GH = `https://github.com/${REPO}`;
+  // GitHub won't commit an empty new file, so an unnamed ship gets a comment line
+  // (the collector ignores lines starting with #).
   const addUrl = (mmsi, label) =>
-    `${GH}/new/main/ships?filename=${mmsi}.txt&value=${encodeURIComponent(label && !/^MMSI /.test(label) ? label : "")}`;
+    `${GH}/new/main/ships?filename=${mmsi}.txt&value=${encodeURIComponent(label && !/^MMSI /.test(label) ? label : `# MMSI ${mmsi}`)}`;
   const editUrl = (mmsi) => `${GH}/edit/main/ships/${mmsi}.txt`;
   const deleteUrl = (mmsi) => `${GH}/delete/main/ships/${mmsi}.txt`;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -320,7 +322,8 @@
     const show = ev.target.closest("[data-show]");
     if (show) select(show.dataset.show, true);
     if (ev.target.closest("[data-add]")) {
-      $("searchMsg").innerHTML = "GitHub'da açılan sayfada <strong>Commit changes</strong>'e basın. Gemi birkaç dakika içinde listeye gelir (sayfayı yenileyin).";
+      $("searchMsg").innerHTML = "GitHub'da açılan sayfada sağ üstteki yeşil <strong>Commit changes…</strong> düğmesine, " +
+        "sonra açılan pencerede tekrar <strong>Commit changes</strong>'e basın. Gemi 10 dakika içinde listeye gelir (sayfayı yenileyin).";
     }
   });
 

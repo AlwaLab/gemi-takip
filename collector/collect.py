@@ -63,8 +63,9 @@ def load_ships() -> dict[str, str]:
     files.sort(key=lambda p: (rank.get(p.stem, len(rank)), p.stem))
     ships = {}
     for path in files:
-        text = path.read_text(encoding="utf-8-sig").strip()
-        ships[path.stem] = text.splitlines()[0].strip()[:60] if text else ""
+        lines = [ln.strip() for ln in path.read_text(encoding="utf-8-sig").splitlines()]
+        labels = [ln for ln in lines if ln and not ln.startswith("#")]  # "# ..." lines are comments
+        ships[path.stem] = labels[0][:60] if labels else ""
     return ships
 
 
