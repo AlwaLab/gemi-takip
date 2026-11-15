@@ -52,7 +52,8 @@ class AisStreamProvider:
         while True:
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.ws_connect(URL, heartbeat=30) as ws:
+                    # compress=15: permessage-deflate; aisstream limits uncompressed bandwidth
+                    async with session.ws_connect(URL, heartbeat=30, compress=15, max_msg_size=0) as ws:
                         # aisstream requires the subscription within 3 s of connecting
                         await ws.send_str(json.dumps(sub))
                         log.info("connected (%s)", "watch" if mmsis else "explore")

@@ -34,7 +34,7 @@ OUT = ROOT / "docs" / "data"
 LATEST = OUT / "latest.json"
 CSV_FILE = OUT / "positions.csv"
 DIRECTORY_FILE = OUT / "directory.json"
-DIRECTORY_SCAN_S = 90
+DIRECTORY_SCAN_S = 360  # one full static-data cycle
 CSV_COLUMNS = ["time_utc", "mmsi", "name", "label", "lat", "lon", "speed_kn",
                "course", "heading", "nav_status", "destination"]
 
@@ -155,16 +155,33 @@ def main() -> int:
         provider = AisStreamProvider(key)
 
     ships = load_ships()
-    seen: dict[str, dict] = {}
     if ships:
         print(f"{len(ships)} gemi dinleniyor (en fazla {LISTEN_MAX_S} sn)…")
-        try:
-            seen = asyncio.run(listen(provider, ships))
-        except ProviderError as exc:
-            print(f"HATA: {exc}", file=sys.stderr)
-            return 1
     else:
         print("ships/ klasöründe gemi yok; takip edilecek gemi yok.")
+    entries = directory.load(DIRECTORY_FILE) if key else {}
+    before = len(entries)
+
+    async def directory_scan():
+        if not key:  # skipped in demo mode
+            return 0, 0
+        print(f"Rehber taranıyor ({DIRECTORY_SCAN_S} sn)…")
+        try:
+            return await directory.scan(key, DIRECTORY_SCAN_S, entries)
+        except ProviderError as exc:
+            print(f"! Rehber taraması atlandı: {exc}")
+            return 0, 0
+
+    async def both():
+        # watched ships and the directory scan run side by side (2 of the 3 allowed connections)
+        watch = listen(provider, ships) if ships else asyncio.sleep(0, result={})
+        return await asyncio.gather(watch, directory_scan())
+
+    try:
+        seen, (msgs, changed) = asyncio.run(both())
+    except ProviderError as exc:
+        print(f"HATA: {exc}", file=sys.stderr)
+        return 1
 
     reported = save(ships, seen, time.time())
     for mmsi, label in ships.items():
@@ -172,16 +189,9 @@ def main() -> int:
         name = seen.get(mmsi, {}).get("name") or label
         print(f"  {mmsi} {name or ''}: {mark}")
 
-    if key:  # grow the search directory (skipped in demo mode)
-        entries = directory.load(DIRECTORY_FILE)
-        before = len(entries)
+    if key:
         for upd in seen.values():
             directory.merge(entries, upd)
-        try:
-            msgs, changed = asyncio.run(directory.scan(key, DIRECTORY_SCAN_S, entries))
-        except ProviderError as exc:
-            print(f"! Rehber taraması atlandı: {exc}")
-            msgs, changed = 0, 0
         directory.save(DIRECTORY_FILE, entries)
         print(f"Rehber: {msgs} mesaj, {changed} değişiklik, {len(entries) - before} yeni gemi, toplam {len(entries)}")
     return 0

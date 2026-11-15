@@ -1,9 +1,11 @@
 """Ship name directory for the search box.
 
-Each collection round listens briefly to the worldwide *static* AIS messages
-(name, type, IMO, call sign; every ship sends one about every 6 minutes) and
-merges them into docs/data/directory.json. The file only grows, one ship per
-line and sorted by MMSI, so git diffs stay small.
+Each collection round listens to the worldwide AIS feed for one full static
+cycle (every ship sends name/type/IMO about every 6 minutes) and merges what
+it hears into docs/data/directory.json. Position reports are included too:
+aisstream attaches the ship name to them, which catches ships whose static
+message fell outside the window. The file only grows, one ship per line and
+sorted by MMSI, so git diffs stay small.
 """
 import asyncio
 import json
@@ -11,7 +13,8 @@ from pathlib import Path
 
 from server.providers.aisstream import AisStreamProvider
 
-STATIC_TYPES = ["ShipStaticData", "StaticDataReport"]
+SCAN_TYPES = ["ShipStaticData", "StaticDataReport",
+              "PositionReport", "StandardClassBPositionReport", "ExtendedClassBPositionReport"]
 WORLD = [[-90, -180], [90, 180]]
 FIELDS = ["mmsi", "name", "ship_type", "imo", "callsign"]
 
@@ -36,6 +39,9 @@ def merge(entries: dict[str, list], upd: dict) -> bool:
         return False
     mmsi = upd["mmsi"]
     old = entries.get(mmsi) or [mmsi, None, None, None, None]
+    is_static = any(upd.get(k) for k in ("ship_type", "imo", "callsign"))
+    if old[1] and not is_static:
+        return False  # position reports only fill gaps; static data owns the name
     new = [mmsi, name,
            upd.get("ship_type") or old[2],
            upd.get("imo") or old[3],
@@ -53,7 +59,7 @@ async def scan(api_key: str, seconds: float, entries: dict[str, list]) -> tuple[
 
     async def run():
         nonlocal seen, changed
-        async for upd in provider.stream(bbox=WORLD, message_types=STATIC_TYPES):
+        async for upd in provider.stream(bbox=WORLD, message_types=SCAN_TYPES):
             seen += 1
             changed += merge(entries, upd)
 
